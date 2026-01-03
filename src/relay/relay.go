@@ -40,6 +40,8 @@ func Bidirectional(ctx context.Context, a, b net.Conn) {
 	case <-errCh:
 		<-errCh
 	case <-ctx.Done():
+		a.Close()
+		b.Close()
 		<-errCh
 		<-errCh
 	}
