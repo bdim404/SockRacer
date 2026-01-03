@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"os"
+
+	flag "github.com/spf13/pflag"
 
 	"github.com/bdim404/parallel-socks/src/config"
 )
@@ -18,6 +19,10 @@ func (s *stringSlice) String() string {
 func (s *stringSlice) Set(value string) error {
 	*s = append(*s, value)
 	return nil
+}
+
+func (s *stringSlice) Type() string {
+	return "string"
 }
 
 type Flags struct {
@@ -51,18 +56,12 @@ func ParseFlags() (*Flags, error) {
 	var logLevel string
 	var help bool
 
-	flag.StringVar(&configPath, "config", "config.json", "Path to config file")
-	flag.StringVar(&configPath, "c", "config.json", "Path to config file (shorthand)")
-	flag.StringVar(&listenAddr, "listen-address", "::1", "Listen address")
-	flag.StringVar(&listenAddr, "a", "::1", "Listen address (shorthand)")
-	flag.StringVar(&listenPort, "listen-port", "", "Listen port")
-	flag.StringVar(&listenPort, "p", "", "Listen port (shorthand)")
-	flag.Var(&socks, "socks", "Upstream SOCKS5 proxy (can be specified multiple times)")
-	flag.Var(&socks, "s", "Upstream SOCKS5 proxy (shorthand)")
-	flag.StringVar(&logLevel, "log-level", "", "Log level: debug or info")
-	flag.StringVar(&logLevel, "l", "", "Log level: debug or info (shorthand)")
-	flag.BoolVar(&help, "help", false, "Show help message")
-	flag.BoolVar(&help, "h", false, "Show help message (shorthand)")
+	flag.StringVarP(&configPath, "config", "c", "config.json", "Path to config file")
+	flag.StringVarP(&listenAddr, "listen-address", "a", "::1", "Listen address")
+	flag.StringVarP(&listenPort, "listen-port", "p", "", "Listen port")
+	flag.VarP(&socks, "socks", "s", "Upstream SOCKS5 proxy (can be specified multiple times)")
+	flag.StringVarP(&logLevel, "log-level", "l", "", "Log level: debug or info")
+	flag.BoolVarP(&help, "help", "h", false, "Show help message")
 	flag.Parse()
 
 	if help {
