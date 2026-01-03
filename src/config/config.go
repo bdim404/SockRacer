@@ -9,9 +9,14 @@ type Config struct {
 	Listeners []ListenerConfig `json:"listeners"`
 }
 
+type UpstreamConfig struct {
+	Name    string `json:"name,omitempty"`
+	Address string `json:"address"`
+}
+
 type ListenerConfig struct {
-	Listen string   `json:"listen"`
-	Socks  []string `json:"socks"`
+	Listen string           `json:"listen"`
+	Socks  []UpstreamConfig `json:"socks"`
 }
 
 func (c *Config) Validate() error {
@@ -51,9 +56,12 @@ func (lc *ListenerConfig) Validate() error {
 	}
 
 	for i, sock := range lc.Socks {
-		_, _, err := net.SplitHostPort(sock)
+		if sock.Address == "" {
+			return fmt.Errorf("socks upstream %d: address is empty", i)
+		}
+		_, _, err := net.SplitHostPort(sock.Address)
 		if err != nil {
-			return fmt.Errorf("invalid socks upstream %d (%s): %w", i, sock, err)
+			return fmt.Errorf("invalid socks upstream %d (%s): %w", i, sock.Address, err)
 		}
 	}
 

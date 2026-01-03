@@ -3,16 +3,31 @@
     {
       "listen": "127.0.0.1:1080",
       "socks": [
-        "us1.example.com:1081",
-        "us2.example.com:1082",
-        "us3.example.com:1083"
+        {
+          "name": "US-West-1",
+          "address": "us1.example.com:1081"
+        },
+        {
+          "name": "US-West-2",
+          "address": "us2.example.com:1082"
+        },
+        {
+          "name": "US-East-1",
+          "address": "us3.example.com:1083"
+        }
       ]
     },
     {
       "listen": "127.0.0.1:1081",
       "socks": [
-        "eu1.example.com:2081",
-        "eu2.example.com:2082"
+        {
+          "name": "EU-Central-1",
+          "address": "eu1.example.com:2081"
+        },
+        {
+          "name": "EU-West-1",
+          "address": "eu2.example.com:2082"
+        }
       ]
     }
   ]

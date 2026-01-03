@@ -67,11 +67,18 @@ func ParseFlags() (*Flags, error) {
 
 		listen := net.JoinHostPort(listenAddr, listenPort)
 
+		upstreams := make([]config.UpstreamConfig, len(socks))
+		for i, addr := range socks {
+			upstreams[i] = config.UpstreamConfig{
+				Address: addr,
+			}
+		}
+
 		cfg := &config.Config{
 			Listeners: []config.ListenerConfig{
 				{
 					Listen: listen,
-					Socks:  socks,
+					Socks:  upstreams,
 				},
 			},
 		}

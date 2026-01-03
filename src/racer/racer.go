@@ -8,15 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bdim404/parallel/src/config"
 	"github.com/bdim404/parallel/src/socks5"
 )
 
 type Racer struct {
-	upstreams []string
+	upstreams []config.UpstreamConfig
 	timeout   time.Duration
 }
 
-func New(upstreams []string, timeout time.Duration) *Racer {
+func New(upstreams []config.UpstreamConfig, timeout time.Duration) *Racer {
 	return &Racer{
 		upstreams: upstreams,
 		timeout:   timeout,
@@ -26,6 +27,7 @@ func New(upstreams []string, timeout time.Duration) *Racer {
 type raceResult struct {
 	conn      net.Conn
 	proxyAddr string
+	proxyName string
 	err       error
 	duration  time.Duration
 }
@@ -40,54 +42,68 @@ func (r *Racer) Race(ctx context.Context, target *socks5.TargetAddress) (net.Con
 	log.Printf("racing %d upstreams for %s", len(r.upstreams), target)
 
 	for _, upstream := range r.upstreams {
-		go func(proxy string) {
+		go func(u config.UpstreamConfig) {
 			connStart := time.Now()
-			conn, err := socks5.DialSOCKS5(raceCtx, proxy, target)
+			conn, err := socks5.DialSOCKS5(raceCtx, u.Address, target)
 			duration := time.Since(connStart)
-			resultCh <- &raceResult{
+
+			select {
+			case resultCh <- &raceResult{
 				conn:      conn,
-				proxyAddr: proxy,
+				proxyAddr: u.Address,
+				proxyName: u.Name,
 				err:       err,
 				duration:  duration,
+			}:
+			case <-raceCtx.Done():
+				if conn != nil {
+					conn.Close()
+				}
 			}
 		}(upstream)
 	}
 
-	var firstConn net.Conn
-	var winnerProxy string
-	var winnerDuration time.Duration
 	var errors []string
-	receivedCount := 0
 
 	for i := 0; i < len(r.upstreams); i++ {
-		result := <-resultCh
-		receivedCount++
+		select {
+		case result := <-resultCh:
+			if result.err == nil {
+				displayName := result.proxyAddr
+				if result.proxyName != "" {
+					displayName = fmt.Sprintf("%s (%s)", result.proxyName, result.proxyAddr)
+				}
 
-		if result.err == nil {
-			if firstConn == nil {
-				firstConn = result.conn
-				winnerProxy = result.proxyAddr
-				winnerDuration = result.duration
-				log.Printf("✓ winner: %s (%dms) - received %d/%d responses",
-					result.proxyAddr, result.duration.Milliseconds(), receivedCount, len(r.upstreams))
-			} else {
-				log.Printf("  closed: %s (%dms) - slower than winner",
-					result.proxyAddr, result.duration.Milliseconds())
-				result.conn.Close()
+				log.Printf("✓ winner: %s (%dms)",
+					displayName, result.duration.Milliseconds())
+
+				go func() {
+					for j := i + 1; j < len(r.upstreams); j++ {
+						select {
+						case r := <-resultCh:
+							if r.conn != nil {
+								r.conn.Close()
+							}
+						case <-raceCtx.Done():
+							return
+						}
+					}
+				}()
+
+				return result.conn, nil
 			}
-		} else {
+
+			displayName := result.proxyAddr
+			if result.proxyName != "" {
+				displayName = fmt.Sprintf("%s (%s)", result.proxyName, result.proxyAddr)
+			}
 			log.Printf("✗ failed: %s (%dms) - %v",
-				result.proxyAddr, result.duration.Milliseconds(), result.err)
-			errors = append(errors, fmt.Sprintf("%s: %v", result.proxyAddr, result.err))
+				displayName, result.duration.Milliseconds(), result.err)
+			errors = append(errors, fmt.Sprintf("%s: %v", displayName, result.err))
+
+		case <-raceCtx.Done():
+			return nil, fmt.Errorf("race timeout after %dms", time.Since(startTime).Milliseconds())
 		}
-	}
-
-	totalDuration := time.Since(startTime)
-
-	if firstConn != nil {
-		log.Printf("race completed for %s: winner=%s, duration=%dms, total=%dms",
-			target, winnerProxy, winnerDuration.Milliseconds(), totalDuration.Milliseconds())
-		return firstConn, nil
 	}
 
 	return nil, fmt.Errorf("all upstreams failed: %s", strings.Join(errors, "; "))
