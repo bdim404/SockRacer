@@ -37,15 +37,10 @@ func (r *Racer) Race(ctx context.Context, target *socks5.TargetAddress) (net.Con
 	defer cancel()
 
 	resultCh := make(chan *raceResult, len(r.upstreams))
-	startTime := time.Now()
-
-	log.Printf("racing %d upstreams for %s", len(r.upstreams), target)
 
 	for _, upstream := range r.upstreams {
 		go func(u config.UpstreamConfig) {
-			connStart := time.Now()
 			conn, err := socks5.DialSOCKS5(raceCtx, u.Address, target)
-			duration := time.Since(connStart)
 
 			select {
 			case resultCh <- &raceResult{
@@ -53,7 +48,6 @@ func (r *Racer) Race(ctx context.Context, target *socks5.TargetAddress) (net.Con
 				proxyAddr: u.Address,
 				proxyName: u.Name,
 				err:       err,
-				duration:  duration,
 			}:
 			case <-raceCtx.Done():
 				if conn != nil {
@@ -69,14 +63,6 @@ func (r *Racer) Race(ctx context.Context, target *socks5.TargetAddress) (net.Con
 		select {
 		case result := <-resultCh:
 			if result.err == nil {
-				displayName := result.proxyAddr
-				if result.proxyName != "" {
-					displayName = fmt.Sprintf("%s (%s)", result.proxyName, result.proxyAddr)
-				}
-
-				log.Printf("✓ winner: %s (%dms)",
-					displayName, result.duration.Milliseconds())
-
 				go func() {
 					for j := i + 1; j < len(r.upstreams); j++ {
 						select {
@@ -97,12 +83,10 @@ func (r *Racer) Race(ctx context.Context, target *socks5.TargetAddress) (net.Con
 			if result.proxyName != "" {
 				displayName = fmt.Sprintf("%s (%s)", result.proxyName, result.proxyAddr)
 			}
-			log.Printf("✗ failed: %s (%dms) - %v",
-				displayName, result.duration.Milliseconds(), result.err)
 			errors = append(errors, fmt.Sprintf("%s: %v", displayName, result.err))
 
 		case <-raceCtx.Done():
-			return nil, fmt.Errorf("race timeout after %dms", time.Since(startTime).Milliseconds())
+			return nil, fmt.Errorf("race timeout")
 		}
 	}
 

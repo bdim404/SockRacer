@@ -5,14 +5,17 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/bdim404/SockRacer/src/config"
+	"github.com/bdim404/SockRacer/src/pool"
 )
 
 type Listener struct {
-	cfg *config.ListenerConfig
-	ln  net.Listener
-	wg  sync.WaitGroup
+	cfg  *config.ListenerConfig
+	ln   net.Listener
+	pool *pool.Pool
+	wg   sync.WaitGroup
 }
 
 func New(cfg *config.ListenerConfig) (*Listener, error) {
@@ -21,9 +24,12 @@ func New(cfg *config.ListenerConfig) (*Listener, error) {
 		return nil, err
 	}
 
+	p := pool.New(cfg.Socks, 5*time.Second)
+
 	return &Listener{
-		cfg: cfg,
-		ln:  ln,
+		cfg:  cfg,
+		ln:   ln,
+		pool: p,
 	}, nil
 }
 
@@ -53,7 +59,7 @@ func (l *Listener) Serve(ctx context.Context) error {
 		l.wg.Add(1)
 		go func() {
 			defer l.wg.Done()
-			handleConnection(ctx, conn, l.cfg.Socks)
+			handleConnection(ctx, conn, l.pool)
 		}()
 	}
 }
