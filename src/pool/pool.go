@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/bdim404/SockRacer/src/config"
@@ -13,17 +12,14 @@ import (
 )
 
 type Pool struct {
-	upstreams    []config.UpstreamConfig
-	timeout      time.Duration
-	lastWinner   *config.UpstreamConfig
-	winnerExpiry time.Time
-	mu           sync.RWMutex
+	upstreams []config.UpstreamConfig
+	timeout   time.Duration
 }
 
-func New(upstreams []config.UpstreamConfig, timeout time.Duration) *Pool {
+func New(upstreams []config.UpstreamConfig, raceTimeout time.Duration) *Pool {
 	return &Pool{
 		upstreams: upstreams,
-		timeout:   timeout,
+		timeout:   raceTimeout,
 	}
 }
 
@@ -34,11 +30,11 @@ type result struct {
 	duration  time.Duration
 }
 
-func (p *Pool) GetConn(ctx context.Context, target *socks5.TargetAddress) (net.Conn, error) {
+func (p *Pool) GetConn(ctx context.Context, target *socks5.TargetAddress) (net.Conn, config.UpstreamConfig, error) {
 	return p.race(ctx, target)
 }
 
-func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn, error) {
+func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn, config.UpstreamConfig, error) {
 	raceCtx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 
@@ -79,20 +75,15 @@ func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn
 				winnerUpstream = res.upstream
 				winnerDuration = res.duration
 
-				p.mu.Lock()
-				p.lastWinner = &winnerUpstream
-				p.winnerExpiry = time.Now().Add(30 * time.Second)
-				p.mu.Unlock()
-
 				winnerName := winnerUpstream.Address
 				if winnerUpstream.Name != "" {
 					winnerName = fmt.Sprintf("%s (%s)", winnerUpstream.Name, winnerUpstream.Address)
 				}
 				log.Printf("✓ %s -> %s (%dms)", target, winnerName, winnerDuration.Milliseconds())
 
-				go p.collectRaceStats(resultCh, len(p.upstreams)-i-1, raceStartTime, &winnerUpstream, target)
+				go p.collectRaceStats(resultCh, len(p.upstreams)-i-1)
 
-				return winnerConn, nil
+				return winnerConn, winnerUpstream, nil
 			}
 
 			if winnerConn != nil && res.conn != nil {
@@ -107,26 +98,22 @@ func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn
 
 		case <-raceCtx.Done():
 			log.Printf("✗ %s race timeout after %dms", target, time.Since(raceStartTime).Milliseconds())
-			return nil, fmt.Errorf("race timeout")
+			return nil, config.UpstreamConfig{}, fmt.Errorf("race timeout")
 		}
 	}
 
 	log.Printf("✗ %s all upstreams failed", target)
 	if firstSOCKS5Error != nil {
-		return nil, firstSOCKS5Error
+		return nil, config.UpstreamConfig{}, firstSOCKS5Error
 	}
-	return nil, fmt.Errorf("all upstreams failed")
+	return nil, config.UpstreamConfig{}, fmt.Errorf("all upstreams failed")
 }
 
-func (p *Pool) collectRaceStats(resultCh chan *result, remaining int, raceStart time.Time, winner *config.UpstreamConfig, target *socks5.TargetAddress) {
+func (p *Pool) collectRaceStats(resultCh chan *result, remaining int) {
 	for i := 0; i < remaining; i++ {
 		res := <-resultCh
 		if res.conn != nil {
 			res.conn.Close()
 		}
 	}
-}
-
-func (p *Pool) GetUpstreams() []config.UpstreamConfig {
-	return p.upstreams
 }

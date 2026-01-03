@@ -35,8 +35,6 @@ func DialSOCKS5(ctx context.Context, proxyAddr string, target *TargetAddress) (n
 	}
 
 	conn.SetDeadline(time.Time{})
-	conn.SetReadDeadline(time.Time{})
-	conn.SetWriteDeadline(time.Time{})
 	return conn, nil
 }
 
