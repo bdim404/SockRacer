@@ -6,7 +6,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/bdim404/parallel/src/config"
+	"github.com/bdim404/SockRacer/src/config"
 )
 
 type stringSlice []string
@@ -26,17 +26,17 @@ type Flags struct {
 }
 
 func printHelp() {
-	fmt.Fprintf(os.Stderr, "Parallel - SOCKS5 parallel racing aggregator\n\n")
+	fmt.Fprintf(os.Stderr, "SockRacer - SOCKS5 parallel racing aggregator\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  parallel [options]\n\n")
+	fmt.Fprintf(os.Stderr, "  sockracer [options]\n\n")
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, "\nExamples:\n")
 	fmt.Fprintf(os.Stderr, "  Config file mode:\n")
-	fmt.Fprintf(os.Stderr, "    parallel --config /path/to/config.json\n")
-	fmt.Fprintf(os.Stderr, "    parallel (uses ./config.json by default)\n\n")
+	fmt.Fprintf(os.Stderr, "    sockracer --config /path/to/config.json\n")
+	fmt.Fprintf(os.Stderr, "    sockracer (uses ./config.json by default)\n\n")
 	fmt.Fprintf(os.Stderr, "  Command line mode:\n")
-	fmt.Fprintf(os.Stderr, "    parallel --listen-address 127.0.0.1 --listen-port 1080 --socks upstream1:1081 --socks upstream2:1082\n")
+	fmt.Fprintf(os.Stderr, "    sockracer --listen-address 127.0.0.1 --listen-port 1080 --socks upstream1:1081 --socks upstream2:1082\n")
 }
 
 func ParseFlags() (*Flags, error) {

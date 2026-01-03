@@ -8,9 +8,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/bdim404/parallel/src/cmd"
-	"github.com/bdim404/parallel/src/config"
-	"github.com/bdim404/parallel/src/listener"
+	"github.com/bdim404/SockRacer/src/cmd"
+	"github.com/bdim404/SockRacer/src/config"
+	"github.com/bdim404/SockRacer/src/listener"
 )
 
 func main() {

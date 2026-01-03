@@ -1,3 +1,3 @@
-module github.com/bdim404/parallel
+module github.com/bdim404/SockRacer
 
 go 1.24.6

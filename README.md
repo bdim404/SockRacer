@@ -1,4 +1,4 @@
-# Parallel
+# SockRacer
 
 SOCKS5 parallel racing aggregator
 
@@ -13,7 +13,16 @@ Create a config file (default: `config.json`):
   "listeners": [
     {
       "listen": "127.0.0.1:1080",
-      "socks": ["upstream1:1081", "upstream2:1082"]
+      "socks": [
+        {
+          "name": "US-West-1",
+          "address": "upstream1:1081"
+        },
+        {
+          "name": "US-East-1",
+          "address": "upstream2:1082"
+        }
+      ]
     }
   ]
 }
@@ -21,19 +30,19 @@ Create a config file (default: `config.json`):
 
 Run with default config file:
 ```bash
-parallel
+sockracer
 ```
 
 Run with custom config file:
 ```bash
-parallel --config /path/to/config.json
-parallel -c /path/to/config.json
+sockracer --config /path/to/config.json
+sockracer -c /path/to/config.json
 ```
 
 ### Command line mode
 
 ```bash
-parallel --listen-address 127.0.0.1 --listen-port 1080 --socks upstream1:1081 --socks upstream2:1082
+sockracer --listen-address 127.0.0.1 --listen-port 1080 --socks upstream1:1081 --socks upstream2:1082
 ```
 
 ## Command Line Options
@@ -55,7 +64,7 @@ parallel --listen-address 127.0.0.1 --listen-port 1080 --socks upstream1:1081 --
 ## Build
 
 ```bash
-go build -o parallel
+go build -o sockracer
 ```
 
 ## Testing
@@ -85,13 +94,7 @@ curl --socks5 127.0.0.1:1080 -w "\nTime: %{time_total}s\n" -o /dev/null -s http:
 2026/01/03 17:26:39 → new connection from 127.0.0.1:58992
 2026/01/03 17:26:39 request from 127.0.0.1:58992 to 104.26.13.205:443
 2026/01/03 17:26:39 racing 6 upstreams for 104.26.13.205:443
-2026/01/03 17:26:39 ✓ winner: upstream1:1080 (114ms) - received 1/6 responses
-2026/01/03 17:26:39   closed: upstream4:1083 (233ms) - slower than winner
-2026/01/03 17:26:40   closed: upstream6:1085 (367ms) - slower than winner
-2026/01/03 17:26:40   closed: upstream3:1082 (468ms) - slower than winner
-2026/01/03 17:26:40   closed: upstream5:1084 (585ms) - slower than winner
-2026/01/03 17:26:40   closed: upstream2:1081 (667ms) - slower than winner
-2026/01/03 17:26:40 race completed for 104.26.13.205:443: winner=upstream1:1080, duration=114ms, total=670ms
+2026/01/03 17:26:39 ✓ winner: US-West-1 (198.18.169.1:1080) (114ms)
 2026/01/03 17:26:40 relaying data for 127.0.0.1:58992 -> 104.26.13.205:443
 2026/01/03 17:26:40 ← connection closed from 127.0.0.1:58992
 ```

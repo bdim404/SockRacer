@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/bdim404/parallel/src/config"
+	"github.com/bdim404/SockRacer/src/config"
 )
 
 type Listener struct {

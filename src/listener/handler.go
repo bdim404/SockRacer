@@ -6,12 +6,13 @@ import (
 	"net"
 	"time"
 
-	"github.com/bdim404/parallel/src/racer"
-	"github.com/bdim404/parallel/src/relay"
-	"github.com/bdim404/parallel/src/socks5"
+	"github.com/bdim404/SockRacer/src/config"
+	"github.com/bdim404/SockRacer/src/racer"
+	"github.com/bdim404/SockRacer/src/relay"
+	"github.com/bdim404/SockRacer/src/socks5"
 )
 
-func handleConnection(ctx context.Context, clientConn net.Conn, upstreams []string) {
+func handleConnection(ctx context.Context, clientConn net.Conn, upstreams []config.UpstreamConfig) {
 	clientAddr := clientConn.RemoteAddr().String()
 	log.Printf("→ new connection from %s", clientAddr)
 	defer func() {

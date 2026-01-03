@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bdim404/parallel/src/config"
-	"github.com/bdim404/parallel/src/socks5"
+	"github.com/bdim404/SockRacer/src/config"
+	"github.com/bdim404/SockRacer/src/socks5"
 )
 
 type Racer struct {

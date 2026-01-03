@@ -27,14 +27,14 @@ jobs:
 
           mkdir -p dist
 
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/parallel-linux-amd64 ./src
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/parallel-linux-arm64 ./src
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/sockracer-linux-amd64 ./src
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/sockracer-linux-arm64 ./src
 
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/parallel-darwin-amd64 ./src
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/parallel-darwin-arm64 ./src
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/sockracer-darwin-amd64 ./src
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/sockracer-darwin-arm64 ./src
 
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/parallel-windows-amd64.exe ./src
-          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/parallel-windows-arm64.exe ./src
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/sockracer-windows-amd64.exe ./src
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/sockracer-windows-arm64.exe ./src
 
           echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
