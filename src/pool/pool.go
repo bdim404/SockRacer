@@ -3,6 +3,7 @@ package pool
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -30,22 +31,10 @@ type result struct {
 	conn      net.Conn
 	upstream  config.UpstreamConfig
 	err       error
-	isFastest bool
+	duration  time.Duration
 }
 
 func (p *Pool) GetConn(ctx context.Context, target *socks5.TargetAddress) (net.Conn, error) {
-	p.mu.RLock()
-	winner := p.lastWinner
-	expired := time.Now().After(p.winnerExpiry)
-	p.mu.RUnlock()
-
-	if winner != nil && !expired {
-		conn, err := socks5.DialSOCKS5(ctx, winner.Address, target)
-		if err == nil {
-			return conn, nil
-		}
-	}
-
 	return p.race(ctx, target)
 }
 
@@ -54,16 +43,20 @@ func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn
 	defer cancel()
 
 	resultCh := make(chan *result, len(p.upstreams))
+	raceStartTime := time.Now()
 
 	for _, upstream := range p.upstreams {
 		go func(u config.UpstreamConfig) {
+			start := time.Now()
 			conn, err := socks5.DialSOCKS5(raceCtx, u.Address, target)
+			duration := time.Since(start)
 
 			select {
 			case resultCh <- &result{
 				conn:     conn,
 				upstream: u,
 				err:      err,
+				duration: duration,
 			}:
 			case <-raceCtx.Done():
 				if conn != nil {
@@ -73,45 +66,53 @@ func (p *Pool) race(ctx context.Context, target *socks5.TargetAddress) (net.Conn
 		}(upstream)
 	}
 
-	var errors []string
+	var winnerConn net.Conn
+	var winnerUpstream config.UpstreamConfig
+	var winnerDuration time.Duration
 
 	for i := 0; i < len(p.upstreams); i++ {
 		select {
 		case res := <-resultCh:
-			if res.err == nil && res.conn != nil {
+			if res.err == nil && res.conn != nil && winnerConn == nil {
+				winnerConn = res.conn
+				winnerUpstream = res.upstream
+				winnerDuration = res.duration
+
 				p.mu.Lock()
-				p.lastWinner = &res.upstream
+				p.lastWinner = &winnerUpstream
 				p.winnerExpiry = time.Now().Add(30 * time.Second)
 				p.mu.Unlock()
 
-				go func() {
-					for j := i + 1; j < len(p.upstreams); j++ {
-						select {
-						case r := <-resultCh:
-							if r.conn != nil {
-								r.conn.Close()
-							}
-						case <-raceCtx.Done():
-							return
-						}
-					}
-				}()
+				winnerName := winnerUpstream.Address
+				if winnerUpstream.Name != "" {
+					winnerName = fmt.Sprintf("%s (%s)", winnerUpstream.Name, winnerUpstream.Address)
+				}
+				log.Printf("✓ %s -> %s (%dms)", target, winnerName, winnerDuration.Milliseconds())
 
-				return res.conn, nil
+				go p.collectRaceStats(resultCh, len(p.upstreams)-i-1, raceStartTime, &winnerUpstream, target)
+
+				return winnerConn, nil
 			}
 
-			if res.err != nil {
-				displayName := res.upstream.Address
-				if res.upstream.Name != "" {
-					displayName = res.upstream.Name
-				}
-				errors = append(errors, displayName)
+			if winnerConn != nil && res.conn != nil {
+				res.conn.Close()
 			}
 
 		case <-raceCtx.Done():
+			log.Printf("✗ %s race timeout after %dms", target, time.Since(raceStartTime).Milliseconds())
 			return nil, fmt.Errorf("race timeout")
 		}
 	}
 
+	log.Printf("✗ %s all upstreams failed", target)
 	return nil, fmt.Errorf("all upstreams failed")
+}
+
+func (p *Pool) collectRaceStats(resultCh chan *result, remaining int, raceStart time.Time, winner *config.UpstreamConfig, target *socks5.TargetAddress) {
+	for i := 0; i < remaining; i++ {
+		res := <-resultCh
+		if res.conn != nil {
+			res.conn.Close()
+		}
+	}
 }

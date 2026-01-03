@@ -1,4 +1,4 @@
-parallel
 *.exe
 *.log
 config.json
+sockracer

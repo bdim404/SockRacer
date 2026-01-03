@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"time"
 )
 
 func DialSOCKS5(ctx context.Context, proxyAddr string, target *TargetAddress) (net.Conn, error) {
 	dialer := &net.Dialer{
-		Timeout: 10 * time.Second,
+		Timeout: 2 * time.Second,
 	}
 
 	conn, err := dialer.DialContext(ctx, "tcp", proxyAddr)
@@ -34,6 +35,8 @@ func DialSOCKS5(ctx context.Context, proxyAddr string, target *TargetAddress) (n
 	}
 
 	conn.SetDeadline(time.Time{})
+	conn.SetReadDeadline(time.Time{})
+	conn.SetWriteDeadline(time.Time{})
 	return conn, nil
 }
 
@@ -96,6 +99,7 @@ func clientConnect(conn net.Conn, target *TargetAddress) error {
 	binary.BigEndian.PutUint16(portBuf, target.Port)
 	req = append(req, portBuf...)
 
+	log.Printf("socks5: sending connect request (%d bytes) to %s:%d", len(req), target.Host, target.Port)
 	if _, err := conn.Write(req); err != nil {
 		return fmt.Errorf("write connect request: %w", err)
 	}
@@ -104,6 +108,8 @@ func clientConnect(conn net.Conn, target *TargetAddress) error {
 	if _, err := io.ReadFull(conn, reply); err != nil {
 		return fmt.Errorf("read reply header: %w", err)
 	}
+
+	log.Printf("socks5: received reply: ver=%d, rep=%d, rsv=%d, atyp=%d", reply[0], reply[1], reply[2], reply[3])
 
 	if reply[0] != Version5 {
 		return fmt.Errorf("unsupported version: %d", reply[0])
@@ -117,18 +123,32 @@ func clientConnect(conn net.Conn, target *TargetAddress) error {
 	switch atyp {
 	case AtypIPv4:
 		discard := make([]byte, 6)
-		io.ReadFull(conn, discard)
+		n, err := io.ReadFull(conn, discard)
+		if err != nil {
+			log.Printf("socks5: error - failed to read IPv4 bind addr (read %d/6 bytes): %v", n, err)
+			return fmt.Errorf("read bind addr: %w", err)
+		}
+		log.Printf("socks5: read bind addr: %d.%d.%d.%d:%d", discard[0], discard[1], discard[2], discard[3], uint16(discard[4])<<8|uint16(discard[5]))
 	case AtypIPv6:
 		discard := make([]byte, 18)
-		io.ReadFull(conn, discard)
+		n, err := io.ReadFull(conn, discard)
+		if err != nil {
+			log.Printf("socks5: error - failed to read IPv6 bind addr (read %d/18 bytes): %v", n, err)
+			return fmt.Errorf("read bind addr: %w", err)
+		}
 	case AtypDomain:
 		lenBuf := make([]byte, 1)
 		if _, err := io.ReadFull(conn, lenBuf); err != nil {
 			return fmt.Errorf("read bind domain length: %w", err)
 		}
 		discard := make([]byte, int(lenBuf[0])+2)
-		io.ReadFull(conn, discard)
+		n, err := io.ReadFull(conn, discard)
+		if err != nil {
+			log.Printf("socks5: error - failed to read domain bind addr (read %d/%d bytes): %v", n, len(discard), err)
+			return fmt.Errorf("read bind addr: %w", err)
+		}
 	}
 
+	log.Printf("socks5: connect handshake completed successfully")
 	return nil
 }

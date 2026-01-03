@@ -4,30 +4,43 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 )
 
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 32*1024)
+	},
+}
+
 func Bidirectional(ctx context.Context, a, b net.Conn) {
-	done := make(chan struct{}, 2)
+	errCh := make(chan error, 2)
 
 	go func() {
-		io.Copy(a, b)
-		a.Close()
-		done <- struct{}{}
+		buf := bufferPool.Get().([]byte)
+		_, err := io.CopyBuffer(a, b, buf)
+		bufferPool.Put(buf)
+		if tcpConn, ok := a.(*net.TCPConn); ok {
+			tcpConn.CloseWrite()
+		}
+		errCh <- err
 	}()
 
 	go func() {
-		io.Copy(b, a)
-		b.Close()
-		done <- struct{}{}
+		buf := bufferPool.Get().([]byte)
+		_, err := io.CopyBuffer(b, a, buf)
+		bufferPool.Put(buf)
+		if tcpConn, ok := b.(*net.TCPConn); ok {
+			tcpConn.CloseWrite()
+		}
+		errCh <- err
 	}()
 
 	select {
-	case <-done:
-		<-done
+	case <-errCh:
+		<-errCh
 	case <-ctx.Done():
-		a.Close()
-		b.Close()
-		<-done
-		<-done
+		<-errCh
+		<-errCh
 	}
 }

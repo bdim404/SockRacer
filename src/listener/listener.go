@@ -56,6 +56,8 @@ func (l *Listener) Serve(ctx context.Context) error {
 			}
 		}
 
+		log.Printf("accepted connection from %s", conn.RemoteAddr())
+
 		l.wg.Add(1)
 		go func() {
 			defer l.wg.Done()
